@@ -2,7 +2,10 @@
 <html lang="zh-TW">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>六店爭霸戰</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -21,6 +24,7 @@
         background-color: #050505;
         color: #e2e8f0;
         overflow-x: hidden;
+        width: 100%;
       }
       .animate-in {
         animation: fadeIn 0.3s ease-out;
@@ -35,6 +39,15 @@
           transform: translateY(0);
         }
       }
+      /* 隱藏滾動條但保留功能 */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
       input[type="number"]::-webkit-outer-spin-button,
       input[type="number"]::-webkit-inner-spin-button {
         -webkit-appearance: none;
@@ -171,7 +184,6 @@
           setTimeout(() => setFormMsg({ type: "", text: "" }), 5000);
         };
 
-        // --- 功能：匯出 Excel ---
         const handleExportExcel = () => {
           const data = rankings.map((t, i) => ({
             名次: i + 1,
@@ -190,12 +202,10 @@
           );
         };
 
-        // --- 功能：清除所有數據 ---
         const handleClearAllData = async () => {
-          const confirm1 = confirm(
-            "警告：這將會永久刪除資料庫中所有的戰隊與回報記錄！此操作不可復原，確定要執行嗎？",
-          );
-          if (!confirm1) return;
+          if (!confirm("警告：這將會永久刪除所有資料！確定執行嗎？")) return;
+          const secondPwd = prompt("請再次輸入管理員密碼以確認重置：");
+          if (secondPwd !== ADMIN_PASSWORD) return alert("密碼錯誤");
 
           setIsSubmitting(true);
           try {
@@ -205,17 +215,14 @@
               .doc(appId)
               .collection("public")
               .doc("data");
-
-            const teamsSnap = await path.collection("teams").get();
-            teamsSnap.docs.forEach((doc) => batch.delete(doc.ref));
-
-            const entriesSnap = await path.collection("entries").get();
-            entriesSnap.docs.forEach((doc) => batch.delete(doc.ref));
-
+            const tSnap = await path.collection("teams").get();
+            tSnap.docs.forEach((doc) => batch.delete(doc.ref));
+            const eSnap = await path.collection("entries").get();
+            eSnap.docs.forEach((doc) => batch.delete(doc.ref));
             await batch.commit();
-            showMsg("success", "所有數據已成功清空！");
+            showMsg("success", "數據已成功清空！");
           } catch (err) {
-            showMsg("error", "清除失敗，請檢查權限設定");
+            showMsg("error", "清除失敗");
           }
           setIsSubmitting(false);
         };
@@ -229,7 +236,7 @@
           )
             return showMsg("error", "戰隊名稱已存在");
           if (newTeam.members.some((m) => !PHONE_REGEX.test(m.phone)))
-            return showMsg("error", "電話格式錯誤");
+            return showMsg("error", "電話格式需為09開頭10位數");
 
           setIsSubmitting(true);
           try {
@@ -245,7 +252,7 @@
                 status: "pending",
                 createdAt: new Date().toISOString(),
               });
-            showMsg("success", "報名成功！請聯繫核對。");
+            showMsg("success", "報名成功！請聯繫闆娘。");
             setNewTeam({
               name: "",
               branch: "",
@@ -265,7 +272,7 @@
             !target ||
             !target.members.some((m) => m.phone === newEntry.phone)
           )
-            return showMsg("error", "電話不在成員名單內");
+            return showMsg("error", "電話不在該成員名單內");
 
           setIsSubmitting(true);
           try {
@@ -318,14 +325,14 @@
         };
 
         return (
-          <div className="min-h-screen pb-24">
+          <div className="min-h-screen pb-24 w-full">
             <header className="p-6 border-b border-amber-600/20 text-center bg-black/50 backdrop-blur-md sticky top-0 z-10">
               <h1 className="text-2xl font-black text-amber-500 flex justify-center items-center gap-2">
                 <Icon name="trophy" className="w-6 h-6" /> 六店爭霸戰
               </h1>
             </header>
 
-            <main className="max-w-md mx-auto p-4 space-y-6">
+            <main className="max-w-md mx-auto p-4 space-y-6 overflow-x-hidden">
               <nav className="flex p-1 bg-[#111] rounded-2xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar">
                 {[
                   { id: "leaderboard", icon: "trophy", label: "排行" },
@@ -339,7 +346,7 @@
                   <button
                     key={t.id}
                     onClick={() => setActiveTab(t.id)}
-                    className={`flex-1 min-w-[60px] flex flex-col items-center py-2 rounded-xl transition-all ${activeTab === t.id ? "bg-amber-600 text-black shadow-lg" : "text-slate-500"}`}
+                    className={`flex-1 min-w-[64px] flex flex-col items-center py-2 rounded-xl transition-all ${activeTab === t.id ? "bg-amber-600 text-black shadow-lg" : "text-slate-500"}`}
                   >
                     <Icon name={t.icon} className="w-4 h-4 mb-1" />
                     <span className="text-[10px] font-bold">{t.label}</span>
@@ -355,9 +362,9 @@
                     name={
                       formMsg.type === "error" ? "alert-circle" : "check-circle"
                     }
-                    className="mr-2"
-                  />{" "}
-                  {formMsg.text}
+                    className="mr-2 shrink-0"
+                  />
+                  <span className="break-all">{formMsg.text}</span>
                 </div>
               )}
 
@@ -374,15 +381,15 @@
                       key={t.id}
                       className={`p-4 rounded-2xl border shadow-xl ${i === 0 ? "border-amber-400 bg-gradient-to-br from-amber-900/20 to-black" : "border-white/5 bg-[#0f0f0f]"}`}
                     >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4">
+                      <div className="flex justify-between items-center gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
                           <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center font-black ${i === 0 ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20" : "bg-white/5 text-slate-500"}`}
+                            className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black ${i === 0 ? "bg-amber-500 text-black" : "bg-white/5 text-slate-500"}`}
                           >
                             {i + 1}
                           </div>
-                          <div>
-                            <div className="font-bold text-sm">
+                          <div className="min-w-0">
+                            <div className="font-bold text-sm truncate">
                               {t.name}{" "}
                               <span className="text-[8px] bg-white/10 px-1 rounded text-slate-400">
                                 {t.branch}
@@ -393,24 +400,29 @@
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right shrink-0">
                           <div className="text-xl font-black text-amber-500">
                             {Math.floor(t.pts).toLocaleString()}
                           </div>
-                          <div className="text-[8px] text-slate-700 uppercase font-bold">
+                          <div className="text-[8px] text-slate-700 uppercase font-bold tracking-tighter">
                             Points
                           </div>
                         </div>
                       </div>
                     </div>
                   ))}
+                  {rankings.length === 0 && (
+                    <div className="text-center py-20 opacity-20 text-xs italic">
+                      等待第一支戰隊誕生...
+                    </div>
+                  )}
                 </div>
               )}
 
               {activeTab === "register" && (
                 <form
                   onSubmit={handleRegister}
-                  className="bg-[#0f0f0f] p-6 rounded-3xl border border-white/10 space-y-4 animate-in shadow-2xl"
+                  className="bg-[#0f0f0f] p-5 rounded-3xl border border-white/10 space-y-4 animate-in shadow-2xl overflow-hidden"
                 >
                   <h2 className="font-black text-amber-500 flex items-center gap-2 text-lg">
                     <Icon name="users" /> 戰隊登記
@@ -440,20 +452,23 @@
                       </option>
                     ))}
                   </select>
+
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-slate-500 ml-1 uppercase">
-                      成員名單 ({newTeam.members.length}/5)
-                    </label>
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                        成員名單 ({newTeam.members.length}/5)
+                      </label>
+                    </div>
                     {newTeam.members.map((m, i) => (
                       <div
                         key={i}
-                        className="flex gap-2 animate-in items-center"
+                        className="grid grid-cols-[1fr_2fr_auto] gap-2 animate-in items-center"
                       >
                         <input
                           type="text"
                           placeholder="姓名"
                           required
-                          className="w-20 bg-black border border-white/10 rounded-xl p-3 text-xs"
+                          className="w-full bg-black border border-white/10 rounded-xl p-3 text-xs min-w-0"
                           value={m.name}
                           onChange={(e) => {
                             const ms = [...newTeam.members];
@@ -465,7 +480,7 @@
                           type="tel"
                           placeholder="09xxxxxxxx"
                           required
-                          className="flex-1 bg-black border border-white/10 rounded-xl p-3 text-xs"
+                          className="w-full bg-black border border-white/10 rounded-xl p-3 text-xs min-w-0"
                           value={m.phone}
                           onChange={(e) => {
                             const ms = [...newTeam.members];
@@ -473,22 +488,24 @@
                             setNewTeam({ ...newTeam, members: ms });
                           }}
                         />
-                        {i > 0 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setNewTeam({
-                                ...newTeam,
-                                members: newTeam.members.filter(
-                                  (_, idx) => idx !== i,
-                                ),
-                              })
-                            }
-                            className="p-2 text-red-500"
-                          >
-                            <Icon name="x-circle" />
-                          </button>
-                        )}
+                        <div className="w-8 flex justify-end">
+                          {i > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewTeam({
+                                  ...newTeam,
+                                  members: newTeam.members.filter(
+                                    (_, idx) => idx !== i,
+                                  ),
+                                })
+                              }
+                              className="text-red-500/70 hover:text-red-500 transition-colors"
+                            >
+                              <Icon name="x-circle" className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                     {newTeam.members.length < 5 && (
@@ -503,7 +520,7 @@
                             ],
                           })
                         }
-                        className="w-full py-2 border-2 border-dashed border-white/5 rounded-xl text-[10px] text-slate-500 font-bold"
+                        className="w-full py-2 border-2 border-dashed border-white/10 rounded-xl text-[10px] text-slate-500 font-bold hover:border-amber-500/50 hover:text-amber-500 transition-all"
                       >
                         + 增加隊員
                       </button>
@@ -512,7 +529,7 @@
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-amber-600 text-black font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all"
+                    className="w-full bg-amber-600 text-black font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all mt-4"
                   >
                     {isSubmitting ? "提交中..." : "送出報名"}
                   </button>
@@ -547,9 +564,9 @@
                     </select>
                     <input
                       type="tel"
-                      placeholder="驗證報名電話"
+                      placeholder="驗證報名時留的電話"
                       required
-                      className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm"
+                      className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm outline-none focus:border-amber-500"
                       value={newEntry.phone}
                       onChange={(e) =>
                         setNewEntry({ ...newEntry, phone: e.target.value })
@@ -559,13 +576,13 @@
                       <label className="text-[10px] text-amber-500 font-black block mb-2 uppercase tracking-widest">
                         本次消費金額
                       </label>
-                      <div className="flex items-center justify-center gap-2 text-amber-500 font-black">
+                      <div className="flex items-center justify-center gap-1 text-amber-500 font-black">
                         <span className="text-2xl">$</span>
                         <input
                           type="number"
                           required
                           placeholder="0"
-                          className="bg-transparent text-5xl text-center outline-none w-40"
+                          className="bg-transparent text-5xl text-center outline-none w-32"
                           value={newEntry.amount}
                           onChange={(e) =>
                             setNewEntry({ ...newEntry, amount: e.target.value })
@@ -586,23 +603,23 @@
 
               {activeTab === "admin" && isAdmin && (
                 <div className="space-y-6 animate-in pb-10">
-                  <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={handleExportExcel}
-                      className="bg-blue-600 text-white p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs"
+                      className="bg-blue-600 text-white p-4 rounded-2xl flex flex-col items-center justify-center gap-1 font-bold text-xs shadow-lg shadow-blue-900/20"
                     >
                       <Icon name="file-spreadsheet" /> 匯出報表
                     </button>
                     <button
                       onClick={handleClearAllData}
-                      className="bg-red-900/40 text-red-500 border border-red-500/20 p-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs"
+                      className="bg-red-900/30 text-red-500 border border-red-500/20 p-4 rounded-2xl flex flex-col items-center justify-center gap-1 font-bold text-xs"
                     >
                       <Icon name="trash-2" /> 清空數據
                     </button>
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-xs font-black text-slate-500 px-1 uppercase tracking-widest">
+                    <h3 className="text-[10px] font-black text-slate-500 px-1 uppercase tracking-widest">
                       待審核戰隊 (
                       {teams.filter((t) => t.status === "pending").length})
                     </h3>
@@ -611,7 +628,7 @@
                       .map((t) => (
                         <div
                           key={t.id}
-                          className="p-5 bg-[#111] rounded-2xl border border-white/5 space-y-4 shadow-xl"
+                          className="p-4 bg-[#111] rounded-2xl border border-white/5 space-y-4 shadow-xl"
                         >
                           <div className="flex justify-between items-start">
                             <div>
@@ -627,7 +644,7 @@
                                 onClick={() =>
                                   adminAction("teams", t.id, "approved")
                                 }
-                                className="bg-amber-600 text-black px-4 py-2 rounded-xl text-[10px] font-black"
+                                className="bg-amber-600 text-black px-3 py-1.5 rounded-lg text-[10px] font-black"
                               >
                                 核准
                               </button>
@@ -635,16 +652,17 @@
                                 onClick={() =>
                                   adminAction("teams", t.id, "delete")
                                 }
-                                className="bg-red-500 text-white px-4 py-2 rounded-xl text-[10px] font-black"
+                                className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-black"
                               >
                                 刪除
                               </button>
                             </div>
                           </div>
-                          <div className="text-[9px] text-slate-500 bg-black/40 p-3 rounded-lg">
+                          <div className="text-[9px] text-slate-500 bg-black/40 p-3 rounded-lg grid grid-cols-1 gap-1">
                             {t.members.map((m, i) => (
-                              <div key={i}>
-                                {m.name} ({m.phone})
+                              <div key={i} className="flex justify-between">
+                                <span>{m.name}</span>
+                                <span>{m.phone}</span>
                               </div>
                             ))}
                           </div>
@@ -653,7 +671,7 @@
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-xs font-black text-slate-500 px-1 uppercase tracking-widest">
+                    <h3 className="text-[10px] font-black text-slate-500 px-1 uppercase tracking-widest">
                       待核對消費 (
                       {entries.filter((e) => e.status === "pending").length})
                     </h3>
@@ -662,25 +680,25 @@
                       .map((e) => (
                         <div
                           key={e.id}
-                          className="p-5 bg-[#111] rounded-2xl border border-white/5 flex justify-between items-center shadow-xl"
+                          className="p-4 bg-[#111] rounded-2xl border border-white/5 flex justify-between items-center shadow-xl"
                         >
-                          <div>
-                            <div className="text-[10px] text-slate-400 font-bold">
+                          <div className="min-w-0 pr-2">
+                            <div className="text-[10px] text-slate-400 font-bold truncate">
                               {teams.find((t) => t.id === e.teamId)?.name}
                             </div>
-                            <div className="font-black text-green-500 text-xl">
+                            <div className="font-black text-green-500 text-lg">
                               ${e.amount.toLocaleString()}
                             </div>
-                            <div className="text-[8px] text-slate-600">
+                            <div className="text-[8px] text-slate-600 truncate">
                               {e.phone}
                             </div>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1 shrink-0">
                             <button
                               onClick={() =>
                                 adminAction("entries", e.id, "approve_entry", e)
                               }
-                              className="bg-green-600 text-white px-4 py-2 rounded-xl text-[10px] font-black"
+                              className="bg-green-600 text-white px-3 py-2 rounded-lg text-[10px] font-black shadow-lg shadow-green-900/20"
                             >
                               通過
                             </button>
@@ -688,7 +706,7 @@
                               onClick={() =>
                                 adminAction("entries", e.id, "delete")
                               }
-                              className="bg-slate-800 text-red-500 px-4 py-2 rounded-xl text-[10px] font-black"
+                              className="bg-slate-800 text-red-500 px-3 py-2 rounded-lg text-[10px] font-black"
                             >
                               拒絕
                             </button>
@@ -701,28 +719,28 @@
 
               {activeTab === "branch" && (
                 <div className="space-y-3 animate-in">
-                  <div className="bg-blue-600/10 border border-blue-500/20 p-4 rounded-2xl">
+                  <div className="bg-blue-600/10 border border-blue-500/20 p-4 rounded-2xl shadow-inner">
                     <div className="flex items-center gap-2 text-blue-400 font-bold text-sm mb-1">
-                      <Icon name="award" /> 分店榮譽賽
+                      <Icon name="award" className="w-5 h-5" /> 分店榮譽賽
                     </div>
-                    <p className="text-[10px] text-slate-500">
-                      冠軍分店之成員，可獲得 2 小時免費續時券。
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                      冠軍分店之所有報名成員，可獲得 2 小時免費續時券乙張。
                     </p>
                   </div>
                   {branchStats.map((b, i) => (
                     <div
                       key={b.name}
-                      className="flex justify-between p-4 bg-[#0f0f0f] rounded-xl border border-white/5 items-center shadow-lg"
+                      className="flex justify-between p-4 bg-[#0f0f0f] rounded-2xl border border-white/5 items-center shadow-lg transition-transform active:scale-[0.99]"
                     >
                       <div className="flex items-center gap-4">
                         <div
-                          className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${i === 0 ? "bg-blue-600 text-white" : "bg-white/5 text-slate-600"}`}
+                          className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${i === 0 ? "bg-blue-600 text-white shadow-lg shadow-blue-900/40" : "bg-white/5 text-slate-600"}`}
                         >
                           {i + 1}
                         </div>
                         <span className="font-bold text-sm">{b.name}</span>
                       </div>
-                      <span className="text-white font-black text-lg">
+                      <span className="text-white font-black text-lg tracking-tighter">
                         ${b.total.toLocaleString()}
                       </span>
                     </div>
@@ -733,7 +751,7 @@
 
             {showPwdModal && (
               <div className="fixed inset-0 z-50 bg-black/98 flex items-center justify-center p-6 backdrop-blur-xl animate-in">
-                <div className="bg-[#111] p-8 rounded-[40px] w-full max-w-xs text-center border border-amber-600/30 shadow-2xl">
+                <div className="bg-[#111] p-8 rounded-[40px] w-full max-w-xs text-center border border-amber-600/30 shadow-[0_0_50px_rgba(217,119,6,0.15)]">
                   <Icon
                     name="lock"
                     className="w-12 h-12 text-amber-500 mx-auto mb-4"
@@ -762,7 +780,7 @@
                       onChange={(e) => setPwdInput(e.target.value)}
                       placeholder="••••"
                     />
-                    <button className="w-full bg-amber-600 text-black font-black py-4 rounded-2xl shadow-xl">
+                    <button className="w-full bg-amber-600 text-black font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-transform">
                       登入系統
                     </button>
                     <button
@@ -771,7 +789,7 @@
                         setShowPwdModal(false);
                         setClickCount(0);
                       }}
-                      className="text-slate-600 text-xs mt-6"
+                      className="text-slate-600 text-xs mt-6 hover:text-slate-400 transition-colors"
                     >
                       取消
                     </button>
@@ -791,9 +809,9 @@
                   setClickCount(n);
                   if (n >= 5) setShowPwdModal(true);
                 }}
-                className="cursor-default select-none px-2"
+                className="cursor-default select-none px-2 active:text-slate-700 transition-colors"
               >
-                V6.1_MOD_STABLE
+                V6.2_LAYOUT_FIXED
               </div>
             </footer>
           </div>
