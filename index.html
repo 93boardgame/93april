@@ -39,7 +39,6 @@
           transform: translateY(0);
         }
       }
-      /* 隱藏滾動條但保留功能 */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -52,6 +51,11 @@
       input[type="number"]::-webkit-inner-spin-button {
         -webkit-appearance: none;
         margin: 0;
+      }
+      /* 優化日期選擇器在外觀上的統一 */
+      input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+        opacity: 0.5;
       }
     </style>
   </head>
@@ -204,9 +208,6 @@
 
         const handleClearAllData = async () => {
           if (!confirm("警告：這將會永久刪除所有資料！確定執行嗎？")) return;
-          const secondPwd = prompt("請再次輸入管理員密碼以確認重置：");
-          if (secondPwd !== ADMIN_PASSWORD) return alert("密碼錯誤");
-
           setIsSubmitting(true);
           try {
             const batch = db.batch();
@@ -312,12 +313,13 @@
             .doc(id);
           try {
             if (action === "delete") await ref.delete();
-            else if (action === "approve_entry")
+            else if (action === "approve_entry") {
+              const multiplier = getMultiplier(data.date);
               await ref.update({
                 status: "approved",
-                points: Math.floor(data.amount * getMultiplier(data.date)),
+                points: Math.floor(data.amount * multiplier),
               });
-            else await ref.update({ status: action });
+            } else await ref.update({ status: action });
             showMsg("success", "更新成功");
           } catch (e) {
             showMsg("error", "操作失敗");
@@ -539,40 +541,67 @@
               {activeTab === "submit" && (
                 <form
                   onSubmit={handleSubmitEntry}
-                  className="bg-[#0f0f0f] p-6 rounded-3xl border border-white/10 space-y-6 animate-in shadow-2xl"
+                  className="bg-[#0f0f0f] p-6 rounded-3xl border border-white/10 space-y-5 animate-in shadow-2xl"
                 >
                   <h2 className="font-black text-amber-500 flex items-center gap-2 text-lg">
                     <Icon name="clipboard-list" /> 消費回報
                   </h2>
                   <div className="space-y-4">
-                    <select
-                      required
-                      className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm"
-                      value={newEntry.teamId}
-                      onChange={(e) =>
-                        setNewEntry({ ...newEntry, teamId: e.target.value })
-                      }
-                    >
-                      <option value="">-- 選擇您的戰隊 --</option>
-                      {teams
-                        .filter((t) => t.status === "approved")
-                        .map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name} (@{t.branch})
-                          </option>
-                        ))}
-                    </select>
-                    <input
-                      type="tel"
-                      placeholder="驗證報名時留的電話"
-                      required
-                      className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm outline-none focus:border-amber-500"
-                      value={newEntry.phone}
-                      onChange={(e) =>
-                        setNewEntry({ ...newEntry, phone: e.target.value })
-                      }
-                    />
-                    <div className="text-center py-6 px-4 bg-black rounded-3xl border border-amber-500/10">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 mb-1 block tracking-wider">
+                        選擇戰隊
+                      </label>
+                      <select
+                        required
+                        className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm"
+                        value={newEntry.teamId}
+                        onChange={(e) =>
+                          setNewEntry({ ...newEntry, teamId: e.target.value })
+                        }
+                      >
+                        <option value="">-- 選擇您的戰隊 --</option>
+                        {teams
+                          .filter((t) => t.status === "approved")
+                          .map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} (@{t.branch})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 mb-1 block tracking-wider">
+                        消費日期
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-amber-500"
+                        value={newEntry.date}
+                        onChange={(e) =>
+                          setNewEntry({ ...newEntry, date: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 mb-1 block tracking-wider">
+                        驗證報名電話
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder="09xxxxxxxx"
+                        required
+                        className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm outline-none focus:border-amber-500"
+                        value={newEntry.phone}
+                        onChange={(e) =>
+                          setNewEntry({ ...newEntry, phone: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="text-center py-5 px-4 bg-black rounded-3xl border border-amber-500/10">
                       <label className="text-[10px] text-amber-500 font-black block mb-2 uppercase tracking-widest">
                         本次消費金額
                       </label>
@@ -677,42 +706,50 @@
                     </h3>
                     {entries
                       .filter((e) => e.status === "pending")
-                      .map((e) => (
-                        <div
-                          key={e.id}
-                          className="p-4 bg-[#111] rounded-2xl border border-white/5 flex justify-between items-center shadow-xl"
-                        >
-                          <div className="min-w-0 pr-2">
-                            <div className="text-[10px] text-slate-400 font-bold truncate">
-                              {teams.find((t) => t.id === e.teamId)?.name}
+                      .map((e) => {
+                        const multiplier = getMultiplier(e.date);
+                        return (
+                          <div
+                            key={e.id}
+                            className="p-4 bg-[#111] rounded-2xl border border-white/5 flex justify-between items-center shadow-xl"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <div className="text-[10px] text-slate-400 font-bold truncate">
+                                {teams.find((t) => t.id === e.teamId)?.name}
+                              </div>
+                              <div className="font-black text-green-500 text-lg">
+                                ${e.amount.toLocaleString()}
+                              </div>
+                              <div className="text-[8px] text-slate-600 truncate">
+                                {e.date} ({multiplier}x)
+                              </div>
                             </div>
-                            <div className="font-black text-green-500 text-lg">
-                              ${e.amount.toLocaleString()}
-                            </div>
-                            <div className="text-[8px] text-slate-600 truncate">
-                              {e.phone}
+                            <div className="flex gap-1 shrink-0">
+                              <button
+                                onClick={() =>
+                                  adminAction(
+                                    "entries",
+                                    e.id,
+                                    "approve_entry",
+                                    e,
+                                  )
+                                }
+                                className="bg-green-600 text-white px-3 py-2 rounded-lg text-[10px] font-black shadow-lg"
+                              >
+                                通過
+                              </button>
+                              <button
+                                onClick={() =>
+                                  adminAction("entries", e.id, "delete")
+                                }
+                                className="bg-slate-800 text-red-500 px-3 py-2 rounded-lg text-[10px] font-black"
+                              >
+                                拒絕
+                              </button>
                             </div>
                           </div>
-                          <div className="flex gap-1 shrink-0">
-                            <button
-                              onClick={() =>
-                                adminAction("entries", e.id, "approve_entry", e)
-                              }
-                              className="bg-green-600 text-white px-3 py-2 rounded-lg text-[10px] font-black shadow-lg shadow-green-900/20"
-                            >
-                              通過
-                            </button>
-                            <button
-                              onClick={() =>
-                                adminAction("entries", e.id, "delete")
-                              }
-                              className="bg-slate-800 text-red-500 px-3 py-2 rounded-lg text-[10px] font-black"
-                            >
-                              拒絕
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </div>
               )}
@@ -734,7 +771,7 @@
                     >
                       <div className="flex items-center gap-4">
                         <div
-                          className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${i === 0 ? "bg-blue-600 text-white shadow-lg shadow-blue-900/40" : "bg-white/5 text-slate-600"}`}
+                          className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${i === 0 ? "bg-blue-600 text-white" : "bg-white/5 text-slate-600"}`}
                         >
                           {i + 1}
                         </div>
@@ -751,7 +788,7 @@
 
             {showPwdModal && (
               <div className="fixed inset-0 z-50 bg-black/98 flex items-center justify-center p-6 backdrop-blur-xl animate-in">
-                <div className="bg-[#111] p-8 rounded-[40px] w-full max-w-xs text-center border border-amber-600/30 shadow-[0_0_50px_rgba(217,119,6,0.15)]">
+                <div className="bg-[#111] p-8 rounded-[40px] w-full max-w-xs text-center border border-amber-600/30 shadow-2xl">
                   <Icon
                     name="lock"
                     className="w-12 h-12 text-amber-500 mx-auto mb-4"
@@ -780,7 +817,7 @@
                       onChange={(e) => setPwdInput(e.target.value)}
                       placeholder="••••"
                     />
-                    <button className="w-full bg-amber-600 text-black font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-transform">
+                    <button className="w-full bg-amber-600 text-black font-black py-4 rounded-2xl shadow-xl">
                       登入系統
                     </button>
                     <button
@@ -789,7 +826,7 @@
                         setShowPwdModal(false);
                         setClickCount(0);
                       }}
-                      className="text-slate-600 text-xs mt-6 hover:text-slate-400 transition-colors"
+                      className="text-slate-600 text-xs mt-6"
                     >
                       取消
                     </button>
@@ -811,7 +848,7 @@
                 }}
                 className="cursor-default select-none px-2 active:text-slate-700 transition-colors"
               >
-                V6.2_LAYOUT_FIXED
+                V6.3_DATE_TRACKING
               </div>
             </footer>
           </div>
